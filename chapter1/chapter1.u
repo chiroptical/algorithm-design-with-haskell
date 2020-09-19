@@ -1,0 +1,137 @@
+-- map f . map g ~ map (f . g)
+-- concatMap f . map g ~ concatMap (f . g)
+-- foldr f e . map g ~ foldr (f . g) e
+-- foldr f e . concat ~ ...
+
+-- h (foldr f e xs) ~ foldr f (h e) xs
+-- h (f x y) = g x (h y)
+-- ^ This is called the _fusion candidate_
+
+-- h (foldr f e [])
+--  = {definition of foldr}
+-- h e
+
+-- foldr g (h e) []
+--  = {definition of foldr}
+-- h e
+
+-- h (foldr f e (x +: xs))
+--  = {definition of foldr}
+-- h (f x (foldr f e xs))
+--  = {fusion condition}
+-- ...
+
+-- foldr g (h e) (x +: xs)
+-- g x (foldr g (h e) xs)
+--  = {induction}
+-- ...
+
+---- Anything below this line is ignored by Unison.
+
+(>>=) = flip List.flatMap
+
+> List.permsTwo [1, 2, 3]
+
+List.permsTwo : [a] -> [[a]]
+List.permsTwo = cases
+  [] -> [[]]
+  xs ->
+    List.picks xs >>= cases
+      (x, ys) -> List.map (zs -> x +: zs) (List.permsTwo ys)
+
+List.permsTwo.doc : Doc
+List.permsTwo.doc = [:
+  The `List.map (zs -> x +: zs) (List.permsTwo ys)`
+  could be replace by
+  ```
+  (x, ys) -> List.permsTwo ys >>= cases
+      zs -> List.singleton (x +: zs)
+  ```
+:]
+
+List.picks : [a] -> [(a, [a])]
+List.picks = cases
+  [] -> []
+  x +: xs ->
+    steps : (a, [a]) -> [(a, [a])]
+    steps = cases
+      (y, ys) -> [(y, x +: ys)]
+    (x, xs) +: List.flatMap steps (List.picks xs)
+
+List.permsOne : [a] -> [[a]]
+List.permsOne = cases
+  []      -> [[]]
+  x +: xs -> List.flatMap (ys -> inserts x ys) (List.permsOne xs)
+
+List.permsOneFold =
+  step x xs = List.flatMap (inserts x) xs
+  List.foldr step [[]]
+
+> List.concats [[1, 2, 3]] [[5, 6, 7]]
+
+List.permsOne : [a] -> [[a]]
+List.permsOne = cases
+  [] -> [[]]
+  x +: xs -> List.flatMap (ys -> List.inserts x ys) (List.permsOne xs)
+
+List.concats : [[a]] -> [[a]] -> [[a]]
+List.concats xs ys = xs ++ ys
+
+List.inserts : a -> [a] -> [[a]]
+List.inserts x = cases
+  [] -> [[x]]
+  y +: ys ->
+    first : [a]
+    first = (x +: (y +: ys))
+    rest : [[a]]
+    rest = List.map (z -> y +: z) (List.inserts x ys)
+    first +: rest
+
+> List.inserts 1 [2, 3, 4]
+
+test> List.inserts.unit = check (List.size (List.inserts 1 [2, 3, 4]) == 4)
+
+test> List.inserts.prop = runs 100 'let
+  i = !(natIn 0 100)
+  is = !(listOf (natIn 0 100))
+  expect (List.size is + 1 == List.size (List.inserts i is)) 
+
+basicTypes.doc : Doc
+basicTypes.doc = [:
+  Basic Types
+  ---
+
+  - `Boolean`
+  - `Char`
+  - `Text`
+  - `Int`
+  - `Nat`
+  - `Float`
+:]
+
+List.map_basic : (a -> b) -> [a] -> [b]
+List.map_basic f = cases
+  [] -> []
+  x +: xs -> f x +: List.map_basic f xs
+
+patternMatchList.doc : Doc
+patternMatchList.doc = [:
+  In a pattern match where `x : a`, `xs : [a]`
+
+  - `x +: xs`
+  - `xs :+ x`
+  - `[1, 2, 3] ++ rest` 
+
+  See https://www.unisonweb.org/docs/language-reference#list-patterns
+  for more details
+:]
+
+-- Basic type declaration with polymorphic type and data constructors
+type ExampleTypeConstructor a = ExampleDataConstructor a
+
+onlineAlgorithm.doc : Doc
+onlineAlgorithm.doc = [:
+  An _online_ algorithm is one that processes a list without having the entire
+  list of inputs at the start. This is useful, for example, when operating on a
+  potentially infinite input stream. The opposite to this is _offline_.
+:]
