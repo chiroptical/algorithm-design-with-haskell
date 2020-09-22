@@ -1,9 +1,120 @@
+
+-- Exercise 1.7, takeWhile in terms of foldRight
+List.takeWhile : (a -> Boolean) -> [a] -> [a]
+List.takeWhile p xs = List.foldRight _a _b
+
+---- Anything below this line is ignored by Unison.
+
+-- Exercise 1.6
+-- Express foldr f e . filter p as an instance of foldRight
+List.foldWithFilter : (a -> b) -> (a -> Boolean) -> [a] -> [b]
+List.foldWithFilter f p =
+  folder : a -> [b] -> [b]
+  folder x ys = if p x then f x +: ys else ys
+  List.foldRight folder []
+
+-- Exercise 1.5
+List.mapAsFold : (a -> b) -> [a] -> [b]
+List.mapAsFold f =
+  folder : a -> [b] -> [b]
+  folder x ys = f x +: ys
+  foldRight folder []
+
+List.filterAsFold : (a -> Boolean) -> [a] -> [a]
+List.filterAsFold f =
+  folder : a -> [a] -> [a]
+  folder x ys = if f x then x +: ys else ys
+  foldRight folder []
+
+-- Exercise 1.4
+List.reverse : [a] -> [a]
+List.reverse =
+  folder : [a] -> a -> [a]
+  folder acc x = x +: acc 
+  List.foldLeft folder []
+
+> List.reverse [1, 2, 3]
+
+-- Exercise 1.3
+List.isSingleton : [a] -> Boolean
+List.isSingleton = cases
+  h +: [] -> true
+  _ -> false
+
+List.singleton : a -> [a]
+List.singleton x = [x]
+
+List.unsingleton : [a] -> Optional a
+List.unsingleton = cases
+  h +: [] -> Some h
+  _ -> None
+
+-- Exercise 1.2
+List.uncons : [a] -> Optional (a, [a])
+List.uncons = cases
+  h +: t -> Some (h, t)
+  _ -> None
+
+List.sum : [Int] -> Int
+List.sum = List.foldRight (+) +0
+
+List.collapse.doc : Doc
+List.collapse.doc = [:
+  Find the shortest positive prefix
+:]
+
+-- This version requires recomputing the sums
+-- List.collapse : [[Int]] -> [Int]
+-- List.collapse xss =
+--   help : [Int] -> [[Int]] -> [Int]
+--   help xs yss =
+--     match (List.sum xs > +0, yss) with
+--       (true, _) -> xs
+--       (_, []) -> xs
+--       (_, h +: t) -> help (xs ++ h) t
+--   help [] xss
+
+
+List.collapse : [[Int]] -> [Int]
+List.collapse xss =
+  labelsum : [[Int]] -> [(Int, [Int])]
+  labelsum xss = List.zip (map List.sum xss) xss
+
+  cat : (Int, [Int]) -> (Int, [Int]) -> (Int, [Int])
+  cat xs ys = match (xs, ys) with
+    ((s, ss), (t, ts)) -> (s + t, ss ++ ts)
+
+  help : (Int, [Int]) -> [(Int, [Int])] -> [Int]
+  help sxs yss = match sxs with
+    (s, xs) ->
+      match (s > +0, yss) with
+        (true, _) -> xs
+        (_, []) -> xs
+        (_, h +: t) -> help (cat (s, xs) h) t
+
+  help (+0, []) (labelsum xss)
+
+test> List.collapse.unit1 = check (List.collapse [[+1], [-3], [+2, +4]] == [+1])
+test> List.collapse.unit2 = check (List.collapse [[-2, +1], [-3], [+2, +4]] == [-2, +1, -3, +2, +4])
+test> List.collapse.unit3 = check (List.collapse [[-2, +1], [+3], [+2, +4]] == [-2, +1, +3])
+
 -- map f . map g ~ map (f . g)
 -- concatMap f . map g ~ concatMap (f . g)
 -- foldr f e . map g ~ foldr (f . g) e
--- foldr f e . concat ~ ...
+-- foldr f e (xs ++ ys) ~ foldr f (foldr f e ys) xs
+-- concat = foldr (++) []
 
--- h (foldr f e xs) ~ foldr f (h e) xs
+-- foldr f e . concat ~ 
+-- The fusion law says that:
+-- h (foldr (++) [] xss) ~ foldr g (h []) xss
+-- As long as,
+-- h (xs ++ ys) ~ g xs (h ys)
+-- h .= foldr f e
+-- g .= flip (foldr f)
+-- Thus,
+-- foldr f e . concat ~ foldr (flip (foldr f)) e
+
+-- h (foldr f e xs) ~ foldr g (h e) xs
 -- h (f x y) = g x (h y)
 -- ^ This is called the _fusion candidate_
 
@@ -19,14 +130,28 @@
 --  = {definition of foldr}
 -- h (f x (foldr f e xs))
 --  = {fusion condition}
--- ...
+-- g x (h (foldr f e xs))
 
 -- foldr g (h e) (x +: xs)
+--  = {definition of foldr}
 -- g x (foldr g (h e) xs)
 --  = {induction}
--- ...
+-- g x (h (foldr f e xs))
 
----- Anything below this line is ignored by Unison.
+-- Above, this is known as _point-wise_ reasoning
+
+-- _point-free_ would look like,
+-- 
+-- map f . filter p . concat
+--  = {distributing filter over concat}
+-- map f . concat . map (filter p)
+--  = {distributing map over concat}
+-- concat . map (map f) . map (filter p)
+--  = {property map}
+-- concat . map (map f . filter p)
+--  = {definition of concatMap}
+-- concatMap (map f . filter p)
+
 
 (>>=) = flip List.flatMap
 
@@ -63,16 +188,16 @@ List.permsOne = cases
   []      -> [[]]
   x +: xs -> List.flatMap (ys -> inserts x ys) (List.permsOne xs)
 
-List.permsOneFold =
-  step x xs = List.flatMap (inserts x) xs
-  List.foldr step [[]]
+-- List.permsOneFold =
+--   step x xs = List.flatMap (inserts x) xs
+--   List.foldr step [[]]
 
 > List.concats [[1, 2, 3]] [[5, 6, 7]]
 
-List.permsOne : [a] -> [[a]]
-List.permsOne = cases
-  [] -> [[]]
-  x +: xs -> List.flatMap (ys -> List.inserts x ys) (List.permsOne xs)
+-- List.permsOne : [a] -> [[a]]
+-- List.permsOne = cases
+--   [] -> [[]]
+--   x +: xs -> List.flatMap (ys -> List.inserts x ys) (List.permsOne xs)
 
 List.concats : [[a]] -> [[a]] -> [[a]]
 List.concats xs ys = xs ++ ys
