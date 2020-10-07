@@ -1,9 +1,148 @@
+-----
+
+-- Exercise 1.20
+
+op : ([x] -> [x]) -> [x] -> ([x] -> [x])
+op f = cases x -> (y -> f x ++ y)
+
+> List.concat [[1, 2], [3]]
+> List.foldLeft op (x -> x) [[1, 2], [3]] []
+
+test> op.test.prop0 = runs 100 'let
+  xss = !(listOf (listOf (natIn 0 100)))
+  res0 = List.concat xss
+  res1 = List.foldLeft op (x -> x) xss []
+  expect (List.size res0 == List.size res1)
+
+test> op.test.prop1 = runs 100 'let
+  xss = !(listOf (listOf (natIn 0 100)))
+  res0 = List.concat xss
+  res1 = List.foldLeft op (x -> x) xss []
+  zip = List.zipWith (Nat.==) res0 res1
+  expect (List.all (x -> x) zip)
+
+List.concat : [[a]] -> [a]
+List.concat = List.flatMap (x -> x)
+
+-- Exercise 1.19, True
+
+-- Exercise 1.18 (skipped)
+
+-- Exercise 1.17 (skipped)
+
+-- Exercise 1.16 (skipped)
+
+-- Exercise 1.15
+
+remove : a -> [a] -> [a]
+remove x xs = List.deleteAt (Search.lubIndexOf x xs) xs
+
+test> remove.test.u0 = check (remove 1 [1, 1, 1] == [1, 1])
+
+List.permsThree : [a] -> [[a]]
+List.permsThree = cases
+  [] -> [[]]
+  xs -> xs >>= (x -> List.map (ys -> x +: ys) (List.permsThree (remove x xs)))
+
+> List.permsThree [1, 2, 3]
+
+removeR : a -> [a] -> [a]
+removeR x = cases
+  y +: ys -> if x == y then ys else y +: removeR x ys
+
+> removeR 1 [1, 1, 1]
+> removeR 1 [1, 2, 3]
+
+test> removeR.test.u0 = check (removeR 1 [1, 1, 1] == [1, 1])
+test> removeR.test.u1 = check (removeR 1 [1, 2, 3] == [2, 3])
+  
+---- Anything below this line is ignored by Unison.
+
+-- Exercise 1.14 (skipped)
+
+-- Exercise 1.13
+
+apply : Nat -> (a -> a) -> a -> a
+apply n f x = 
+  go : a -> Int -> a
+  go acc = cases
+    +0 -> acc
+    m -> go (f acc) (m Int.- +1)
+  go x (Nat.toInt n)
+
+test> apply.test.u0 = check (apply 10 (x -> x) 0 == 0)
+test> apply.test.u1 = check (apply 10 (x -> x + 1) 0 == 10)
+
+-- Exercise 1.12
+
+-- map (foldl f e) . inits = ...
+
+> List.inits [1, 2, 3]
+
+-- map (foldr f e) . tails = ...
+
+-- Exercise 1.11 
+powerTenProgression : Nat -> Nat -> [Nat]
+powerTenProgression start stop = List.map (Nat.pow 10) (List.range start stop)
+
+integer : [Nat] -> Nat
+integer xs =
+  use Nat * +
+  ys = List.zip xs (List.reverse (powerTenProgression 0 (List.size xs)))
+  List.foldr (pair acc -> match pair with
+                (x, m) -> x * m + acc
+             ) 0 ys
+
+test> integer.u0 = check (integer [1, 4, 8, 4, 9, 3] == 148493)
+
+fraction : [Nat] -> Float
+fraction xs = 
+  ys = List.zip xs (powerTenProgression 1 (List.size xs + 1))
+  List.foldr (pair acc -> match pair with
+                (x, m) -> (Nat.toFloat x) / (Nat.toFloat m) Float.+ acc
+             ) 0.0 ys
+
+test> fraction.u0 = check (fraction [1, 4, 8, 4, 9, 3] == 0.148493)
+
+-- Exercise 1.10
+
+-- foldr g e [x, y, z] = g x (g y (g z e))
+-- foldl g e [x, y, z] = g (g (g e x) y) z
+-- What is true of g, when
+-- foldr g e [x, y, z] == foldl g e [x, y, z]
+-- g x y == g y x i.e. commute
+
+-- Exercise 1.9
+
+List.foldr f e = cases
+  x +: xs -> f x (List.foldr f e xs)
+  _ -> e
+
+> List.foldr (x y -> x Int.- y) +0 [+1, +2, +3, +4]
+
+List.foldl f e = cases
+  xs :+ x -> f (List.foldl f e xs) x
+  _ -> e
+
+> List.foldl (x y -> x Int.- y) +0 [+1, +2, +3, +4]
+
+-- Exercise 1.8, implement dropWhileEnd in terms of foldr
+List.dropWhileEnd : (a -> Boolean) -> [a] -> [a]
+List.dropWhileEnd p = List.reverse . List.takeWhile p . List.reverse 
+  -- folder : a -> [a] -> [a]
+  -- folder x ys = _a
+  -- List.foldRight folder []
+
+> List.dropWhileEnd isEven [1, 4, 3, 6, 2, 4]
 
 -- Exercise 1.7, takeWhile in terms of foldRight
 List.takeWhile : (a -> Boolean) -> [a] -> [a]
-List.takeWhile p xs = List.foldRight _a _b
+List.takeWhile p =
+  folder : a -> [a] -> [a]
+  folder x ys = if p x then x +: ys else []
+  List.foldRight folder []
 
----- Anything below this line is ignored by Unison.
+> List.takeWhile (x -> x < 3) [1, 2, 3, 4, 5]
 
 -- Exercise 1.6
 -- Express foldr f e . filter p as an instance of foldRight
@@ -15,8 +154,6 @@ List.foldWithFilter f p =
 
 -- Exercise 1.5
 List.mapAsFold : (a -> b) -> [a] -> [b]
-List.mapAsFold f =
-  folder : a -> [b] -> [b]
   folder x ys = f x +: ys
   foldRight folder []
 
@@ -57,6 +194,9 @@ List.uncons = cases
 
 List.sum : [Int] -> Int
 List.sum = List.foldRight (+) +0
+
+-- Exercise 1.1
+-- Skipped
 
 List.collapse.doc : Doc
 List.collapse.doc = [:
@@ -212,7 +352,6 @@ List.inserts x = cases
     rest = List.map (z -> y +: z) (List.inserts x ys)
     first +: rest
 
-> List.inserts 1 [2, 3, 4]
 
 test> List.inserts.unit = check (List.size (List.inserts 1 [2, 3, 4]) == 4)
 
