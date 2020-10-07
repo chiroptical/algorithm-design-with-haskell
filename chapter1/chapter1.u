@@ -1,0 +1,401 @@
+-----
+
+-- Exercise 1.20
+
+op : ([x] -> [x]) -> [x] -> ([x] -> [x])
+op f = cases x -> (y -> f x ++ y)
+
+> List.concat [[1, 2], [3]]
+> List.foldLeft op (x -> x) [[1, 2], [3]] []
+
+test> op.test.prop0 = runs 100 'let
+  xss = !(listOf (listOf (natIn 0 100)))
+  res0 = List.concat xss
+  res1 = List.foldLeft op (x -> x) xss []
+  expect (List.size res0 == List.size res1)
+
+test> op.test.prop1 = runs 100 'let
+  xss = !(listOf (listOf (natIn 0 100)))
+  res0 = List.concat xss
+  res1 = List.foldLeft op (x -> x) xss []
+  zip = List.zipWith (Nat.==) res0 res1
+  expect (List.all (x -> x) zip)
+
+List.concat : [[a]] -> [a]
+List.concat = List.flatMap (x -> x)
+
+-- Exercise 1.19, True
+
+-- Exercise 1.18 (skipped)
+
+-- Exercise 1.17 (skipped)
+
+-- Exercise 1.16 (skipped)
+
+-- Exercise 1.15
+
+remove : a -> [a] -> [a]
+remove x xs = List.deleteAt (Search.lubIndexOf x xs) xs
+
+test> remove.test.u0 = check (remove 1 [1, 1, 1] == [1, 1])
+
+List.permsThree : [a] -> [[a]]
+List.permsThree = cases
+  [] -> [[]]
+  xs -> xs >>= (x -> List.map (ys -> x +: ys) (List.permsThree (remove x xs)))
+
+> List.permsThree [1, 2, 3]
+
+removeR : a -> [a] -> [a]
+removeR x = cases
+  y +: ys -> if x == y then ys else y +: removeR x ys
+
+> removeR 1 [1, 1, 1]
+> removeR 1 [1, 2, 3]
+
+test> removeR.test.u0 = check (removeR 1 [1, 1, 1] == [1, 1])
+test> removeR.test.u1 = check (removeR 1 [1, 2, 3] == [2, 3])
+  
+---- Anything below this line is ignored by Unison.
+
+-- Exercise 1.14 (skipped)
+
+-- Exercise 1.13
+
+apply : Nat -> (a -> a) -> a -> a
+apply n f x = 
+  go : a -> Int -> a
+  go acc = cases
+    +0 -> acc
+    m -> go (f acc) (m Int.- +1)
+  go x (Nat.toInt n)
+
+test> apply.test.u0 = check (apply 10 (x -> x) 0 == 0)
+test> apply.test.u1 = check (apply 10 (x -> x + 1) 0 == 10)
+
+-- Exercise 1.12
+
+-- map (foldl f e) . inits = ...
+
+> List.inits [1, 2, 3]
+
+-- map (foldr f e) . tails = ...
+
+-- Exercise 1.11 
+powerTenProgression : Nat -> Nat -> [Nat]
+powerTenProgression start stop = List.map (Nat.pow 10) (List.range start stop)
+
+integer : [Nat] -> Nat
+integer xs =
+  use Nat * +
+  ys = List.zip xs (List.reverse (powerTenProgression 0 (List.size xs)))
+  List.foldr (pair acc -> match pair with
+                (x, m) -> x * m + acc
+             ) 0 ys
+
+test> integer.u0 = check (integer [1, 4, 8, 4, 9, 3] == 148493)
+
+fraction : [Nat] -> Float
+fraction xs = 
+  ys = List.zip xs (powerTenProgression 1 (List.size xs + 1))
+  List.foldr (pair acc -> match pair with
+                (x, m) -> (Nat.toFloat x) / (Nat.toFloat m) Float.+ acc
+             ) 0.0 ys
+
+test> fraction.u0 = check (fraction [1, 4, 8, 4, 9, 3] == 0.148493)
+
+-- Exercise 1.10
+
+-- foldr g e [x, y, z] = g x (g y (g z e))
+-- foldl g e [x, y, z] = g (g (g e x) y) z
+-- What is true of g, when
+-- foldr g e [x, y, z] == foldl g e [x, y, z]
+-- g x y == g y x i.e. commute
+
+-- Exercise 1.9
+
+List.foldr f e = cases
+  x +: xs -> f x (List.foldr f e xs)
+  _ -> e
+
+> List.foldr (x y -> x Int.- y) +0 [+1, +2, +3, +4]
+
+List.foldl f e = cases
+  xs :+ x -> f (List.foldl f e xs) x
+  _ -> e
+
+> List.foldl (x y -> x Int.- y) +0 [+1, +2, +3, +4]
+
+-- Exercise 1.8, implement dropWhileEnd in terms of foldr
+List.dropWhileEnd : (a -> Boolean) -> [a] -> [a]
+List.dropWhileEnd p = List.reverse . List.takeWhile p . List.reverse 
+  -- folder : a -> [a] -> [a]
+  -- folder x ys = _a
+  -- List.foldRight folder []
+
+> List.dropWhileEnd isEven [1, 4, 3, 6, 2, 4]
+
+-- Exercise 1.7, takeWhile in terms of foldRight
+List.takeWhile : (a -> Boolean) -> [a] -> [a]
+List.takeWhile p =
+  folder : a -> [a] -> [a]
+  folder x ys = if p x then x +: ys else []
+  List.foldRight folder []
+
+> List.takeWhile (x -> x < 3) [1, 2, 3, 4, 5]
+
+-- Exercise 1.6
+-- Express foldr f e . filter p as an instance of foldRight
+List.foldWithFilter : (a -> b) -> (a -> Boolean) -> [a] -> [b]
+List.foldWithFilter f p =
+  folder : a -> [b] -> [b]
+  folder x ys = if p x then f x +: ys else ys
+  List.foldRight folder []
+
+-- Exercise 1.5
+List.mapAsFold : (a -> b) -> [a] -> [b]
+  folder x ys = f x +: ys
+  foldRight folder []
+
+List.filterAsFold : (a -> Boolean) -> [a] -> [a]
+List.filterAsFold f =
+  folder : a -> [a] -> [a]
+  folder x ys = if f x then x +: ys else ys
+  foldRight folder []
+
+-- Exercise 1.4
+List.reverse : [a] -> [a]
+List.reverse =
+  folder : [a] -> a -> [a]
+  folder acc x = x +: acc 
+  List.foldLeft folder []
+
+> List.reverse [1, 2, 3]
+
+-- Exercise 1.3
+List.isSingleton : [a] -> Boolean
+List.isSingleton = cases
+  h +: [] -> true
+  _ -> false
+
+List.singleton : a -> [a]
+List.singleton x = [x]
+
+List.unsingleton : [a] -> Optional a
+List.unsingleton = cases
+  h +: [] -> Some h
+  _ -> None
+
+-- Exercise 1.2
+List.uncons : [a] -> Optional (a, [a])
+List.uncons = cases
+  h +: t -> Some (h, t)
+  _ -> None
+
+List.sum : [Int] -> Int
+List.sum = List.foldRight (+) +0
+
+-- Exercise 1.1
+-- Skipped
+
+List.collapse.doc : Doc
+List.collapse.doc = [:
+  Find the shortest positive prefix
+:]
+
+-- This version requires recomputing the sums
+-- List.collapse : [[Int]] -> [Int]
+-- List.collapse xss =
+--   help : [Int] -> [[Int]] -> [Int]
+--   help xs yss =
+--     match (List.sum xs > +0, yss) with
+--       (true, _) -> xs
+--       (_, []) -> xs
+--       (_, h +: t) -> help (xs ++ h) t
+--   help [] xss
+
+
+List.collapse : [[Int]] -> [Int]
+List.collapse xss =
+  labelsum : [[Int]] -> [(Int, [Int])]
+  labelsum xss = List.zip (map List.sum xss) xss
+
+  cat : (Int, [Int]) -> (Int, [Int]) -> (Int, [Int])
+  cat xs ys = match (xs, ys) with
+    ((s, ss), (t, ts)) -> (s + t, ss ++ ts)
+
+  help : (Int, [Int]) -> [(Int, [Int])] -> [Int]
+  help sxs yss = match sxs with
+    (s, xs) ->
+      match (s > +0, yss) with
+        (true, _) -> xs
+        (_, []) -> xs
+        (_, h +: t) -> help (cat (s, xs) h) t
+
+  help (+0, []) (labelsum xss)
+
+test> List.collapse.unit1 = check (List.collapse [[+1], [-3], [+2, +4]] == [+1])
+test> List.collapse.unit2 = check (List.collapse [[-2, +1], [-3], [+2, +4]] == [-2, +1, -3, +2, +4])
+test> List.collapse.unit3 = check (List.collapse [[-2, +1], [+3], [+2, +4]] == [-2, +1, +3])
+
+-- map f . map g ~ map (f . g)
+-- concatMap f . map g ~ concatMap (f . g)
+-- foldr f e . map g ~ foldr (f . g) e
+-- foldr f e (xs ++ ys) ~ foldr f (foldr f e ys) xs
+-- concat = foldr (++) []
+
+-- foldr f e . concat ~ 
+-- The fusion law says that:
+-- h (foldr (++) [] xss) ~ foldr g (h []) xss
+-- As long as,
+-- h (xs ++ ys) ~ g xs (h ys)
+-- h .= foldr f e
+-- g .= flip (foldr f)
+-- Thus,
+-- foldr f e . concat ~ foldr (flip (foldr f)) e
+
+-- h (foldr f e xs) ~ foldr g (h e) xs
+-- h (f x y) = g x (h y)
+-- ^ This is called the _fusion candidate_
+
+-- h (foldr f e [])
+--  = {definition of foldr}
+-- h e
+
+-- foldr g (h e) []
+--  = {definition of foldr}
+-- h e
+
+-- h (foldr f e (x +: xs))
+--  = {definition of foldr}
+-- h (f x (foldr f e xs))
+--  = {fusion condition}
+-- g x (h (foldr f e xs))
+
+-- foldr g (h e) (x +: xs)
+--  = {definition of foldr}
+-- g x (foldr g (h e) xs)
+--  = {induction}
+-- g x (h (foldr f e xs))
+
+-- Above, this is known as _point-wise_ reasoning
+
+-- _point-free_ would look like,
+-- 
+-- map f . filter p . concat
+--  = {distributing filter over concat}
+-- map f . concat . map (filter p)
+--  = {distributing map over concat}
+-- concat . map (map f) . map (filter p)
+--  = {property map}
+-- concat . map (map f . filter p)
+--  = {definition of concatMap}
+-- concatMap (map f . filter p)
+
+
+(>>=) = flip List.flatMap
+
+> List.permsTwo [1, 2, 3]
+
+List.permsTwo : [a] -> [[a]]
+List.permsTwo = cases
+  [] -> [[]]
+  xs ->
+    List.picks xs >>= cases
+      (x, ys) -> List.map (zs -> x +: zs) (List.permsTwo ys)
+
+List.permsTwo.doc : Doc
+List.permsTwo.doc = [:
+  The `List.map (zs -> x +: zs) (List.permsTwo ys)`
+  could be replace by
+  ```
+  (x, ys) -> List.permsTwo ys >>= cases
+      zs -> List.singleton (x +: zs)
+  ```
+:]
+
+List.picks : [a] -> [(a, [a])]
+List.picks = cases
+  [] -> []
+  x +: xs ->
+    steps : (a, [a]) -> [(a, [a])]
+    steps = cases
+      (y, ys) -> [(y, x +: ys)]
+    (x, xs) +: List.flatMap steps (List.picks xs)
+
+List.permsOne : [a] -> [[a]]
+List.permsOne = cases
+  []      -> [[]]
+  x +: xs -> List.flatMap (ys -> inserts x ys) (List.permsOne xs)
+
+-- List.permsOneFold =
+--   step x xs = List.flatMap (inserts x) xs
+--   List.foldr step [[]]
+
+> List.concats [[1, 2, 3]] [[5, 6, 7]]
+
+-- List.permsOne : [a] -> [[a]]
+-- List.permsOne = cases
+--   [] -> [[]]
+--   x +: xs -> List.flatMap (ys -> List.inserts x ys) (List.permsOne xs)
+
+List.concats : [[a]] -> [[a]] -> [[a]]
+List.concats xs ys = xs ++ ys
+
+List.inserts : a -> [a] -> [[a]]
+List.inserts x = cases
+  [] -> [[x]]
+  y +: ys ->
+    first : [a]
+    first = (x +: (y +: ys))
+    rest : [[a]]
+    rest = List.map (z -> y +: z) (List.inserts x ys)
+    first +: rest
+
+
+test> List.inserts.unit = check (List.size (List.inserts 1 [2, 3, 4]) == 4)
+
+test> List.inserts.prop = runs 100 'let
+  i = !(natIn 0 100)
+  is = !(listOf (natIn 0 100))
+  expect (List.size is + 1 == List.size (List.inserts i is)) 
+
+basicTypes.doc : Doc
+basicTypes.doc = [:
+  Basic Types
+  ---
+
+  - `Boolean`
+  - `Char`
+  - `Text`
+  - `Int`
+  - `Nat`
+  - `Float`
+:]
+
+List.map_basic : (a -> b) -> [a] -> [b]
+List.map_basic f = cases
+  [] -> []
+  x +: xs -> f x +: List.map_basic f xs
+
+patternMatchList.doc : Doc
+patternMatchList.doc = [:
+  In a pattern match where `x : a`, `xs : [a]`
+
+  - `x +: xs`
+  - `xs :+ x`
+  - `[1, 2, 3] ++ rest` 
+
+  See https://www.unisonweb.org/docs/language-reference#list-patterns
+  for more details
+:]
+
+-- Basic type declaration with polymorphic type and data constructors
+type ExampleTypeConstructor a = ExampleDataConstructor a
+
+onlineAlgorithm.doc : Doc
+onlineAlgorithm.doc = [:
+  An _online_ algorithm is one that processes a list without having the entire
+  list of inputs at the start. This is useful, for example, when operating on a
+  potentially infinite input stream. The opposite to this is _offline_.
+:]

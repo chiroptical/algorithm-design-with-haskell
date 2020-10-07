@@ -10,3 +10,10 @@ I receive no financial benefit.
 
 The code is written in Unison. You can download Unison from [their
 website](https://www.unisonweb.org/docs/quickstart#step-1-install-unison).
+
+Notes
+---
+
+- Report OOM on `pull https://github.com/unisonweb/base:.releases._latest base`
+- Add `.base.List.permutations` to Unison
+
