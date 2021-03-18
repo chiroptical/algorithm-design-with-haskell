@@ -8,5 +8,6 @@ Jeremy Gibbons. You can find the book on
 [Amazon](https://www.amazon.com/Algorithm-Design-Haskell-Richard-Bird/dp/1108491618).
 I receive no financial benefit.
 
-The code is written in Unison. You can download Unison from [their
-website](https://www.unisonweb.org/docs/quickstart#step-1-install-unison).
+Each folder, e.g. `chapter1/` contains a stack project with the code written
+during the chapter.  Stack can be found
+[here](https://docs.haskellstack.org/en/stable/README/#how-to-install)
