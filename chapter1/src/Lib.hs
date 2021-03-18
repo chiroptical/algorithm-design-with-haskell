@@ -3,6 +3,7 @@
 module Lib where
 
 import Data.Function
+import Data.List (inits, tails)
 import Prelude hiding (filter, map)
 
 -- This isn't exactly correct, but should be fine for this book
@@ -170,23 +171,45 @@ dropWhileEnd p = foldr folder []
 
 -- Exercise 1.11
 
--- integer [4, 1, 3] = 413
-
 tenToFromZero :: [Integer]
 tenToFromZero = (10 ^) <$> [0 ..]
 
 tenToFromOne :: [Integer]
 tenToFromOne = (10 ^) <$> [1 ..]
 
+-- | integer [4, 1, 3] = 413
 integer :: [Integer] -> Integer
+--integer = snd . foldr (\val (exp, acc) -> (exp + 1, val * 10 ^ exp + acc)) (0, 0)
 integer xs = sum $ zipWith (*) (reverse xs) tenToFromZero
 
---integer = snd . foldr (\val (exp, acc) -> (exp + 1, val * 10 ^ exp + acc)) (0, 0)
-
--- fraction [4, 1, 3] = 0.413
-
+-- | fraction [4, 1, 3] = 0.413
 fraction :: [Integer] -> Rational
-fraction xs = sum $ zipWith ((/) `on` fromIntegral) xs tenToFromOne
-
 -- fraction xs = sum $ zipWith (/) (fromIntegral <$> xs) (fromIntegral <$> tenToFromOne)
 -- fraction = snd . foldl (\(exp, acc) val -> (exp + 1, fromIntegral val / (10 ^ exp) + acc)) (1, 0.0)
+fraction xs = sum $ zipWith ((/) `on` fromIntegral) xs tenToFromOne
+
+-- Exercise 1.12
+
+-- LHS: map (foldl f e) . inits
+a :: (b -> a -> b) -> b -> [a] -> [b]
+a f e = map (foldl f e) . inits
+
+a' :: (b -> a -> b) -> b -> [a] -> [b]
+a' = scanl
+
+-- LHS: map (foldr f e) . tails
+b :: (a -> b -> b) -> b -> [a] -> [b]
+b f e = map (foldr f e) . tails
+
+b' :: (a -> b -> b) -> b -> [a] -> [b]
+b' = scanr
+
+-- Exercise 1.13
+
+apply :: Nat -> (a -> a) -> a -> a
+apply x f y | x > 0 = foldl (\acc _ -> f acc) y [0 .. x - 1]
+apply _ _ _ = error "must be positive"
+
+-- Exercise 1.14 - skip
+
+-- skipping rest, not clever enough to figure these out... yet!
